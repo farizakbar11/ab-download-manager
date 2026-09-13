@@ -70,6 +70,7 @@ object YouTubeVideoService {
                 "--dump-json",
                 "--no-playlist",
                 "--no-warnings",
+                "--extractor-args", "youtube:player_client=ios,android,web_creator,web",
                 url
             )
             pb.redirectErrorStream(false)

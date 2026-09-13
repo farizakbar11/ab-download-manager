@@ -112,7 +112,17 @@ abstract class NewDownloadUiChecker<
         linkChecker.suggestedName
             .onEach {
                 it?.let { name ->
-                    this.name.update { name }
+                    val currentName = this.name.value
+                    val isCurrentGeneric = currentName.isBlank() ||
+                            currentName.startsWith("watch.") ||
+                            currentName.equals("videoplayback", ignoreCase = true)
+                    val isNewGeneric = name.startsWith("watch.") ||
+                            name.equals("videoplayback", ignoreCase = true)
+                    if (isCurrentGeneric && !isNewGeneric) {
+                        this.name.update { name }
+                    } else if (currentName.isBlank()) {
+                        this.name.update { name }
+                    }
                 }
             }.launchIn(scope)
 

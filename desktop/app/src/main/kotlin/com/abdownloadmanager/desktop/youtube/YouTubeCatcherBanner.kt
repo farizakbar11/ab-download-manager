@@ -31,8 +31,16 @@ fun YouTubeCatcherBanner(
     onFormatSelected: (format: YouTubeFormatOption, videoTitle: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val isYouTube = remember(currentUrl) { YouTubeVideoService.isYouTubeUrl(currentUrl) }
-    if (!isYouTube) return
+    var activeYouTubeUrl by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(currentUrl) {
+        if (YouTubeVideoService.isYouTubeUrl(currentUrl)) {
+            activeYouTubeUrl = currentUrl
+        }
+    }
+
+    val ytUrl = activeYouTubeUrl ?: if (YouTubeVideoService.isYouTubeUrl(currentUrl)) currentUrl else null
+    if (ytUrl == null) return
 
     val scope = rememberCoroutineScope()
     var isLoading by remember { mutableStateOf(false) }
@@ -41,24 +49,22 @@ fun YouTubeCatcherBanner(
     var selectedFormat by remember { mutableStateOf<YouTubeFormatOption?>(null) }
 
     // Auto-resolve when valid YouTube URL is detected
-    LaunchedEffect(currentUrl) {
-        if (YouTubeVideoService.isYouTubeUrl(currentUrl)) {
-            isLoading = true
-            errorMessage = null
-            videoInfo = null
-            selectedFormat = null
-            val result = YouTubeVideoService.resolveVideo(currentUrl)
-            isLoading = false
-            result.onSuccess { info ->
-                videoInfo = info
-                val defaultFmt = info.defaultFormat
-                selectedFormat = defaultFmt
-                if (defaultFmt != null) {
-                    onFormatSelected(defaultFmt, info.title)
-                }
-            }.onFailure { err ->
-                errorMessage = err.message ?: "Gagal mengambil info YouTube"
+    LaunchedEffect(ytUrl) {
+        isLoading = true
+        errorMessage = null
+        videoInfo = null
+        selectedFormat = null
+        val result = YouTubeVideoService.resolveVideo(ytUrl)
+        isLoading = false
+        result.onSuccess { info ->
+            videoInfo = info
+            val defaultFmt = info.defaultFormat
+            selectedFormat = defaultFmt
+            if (defaultFmt != null) {
+                onFormatSelected(defaultFmt, info.title)
             }
+        }.onFailure { err ->
+            errorMessage = err.message ?: "Gagal mengambil info YouTube"
         }
     }
 
@@ -135,7 +141,7 @@ fun YouTubeCatcherBanner(
                         scope.launch {
                             isLoading = true
                             errorMessage = null
-                            val res = YouTubeVideoService.resolveVideo(currentUrl)
+                            val res = YouTubeVideoService.resolveVideo(ytUrl)
                             isLoading = false
                             res.onSuccess { info ->
                                 videoInfo = info

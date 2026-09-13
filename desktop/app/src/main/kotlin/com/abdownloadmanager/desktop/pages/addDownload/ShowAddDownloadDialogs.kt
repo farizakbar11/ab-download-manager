@@ -5,7 +5,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.v2.WindowBoundsProvider
@@ -54,9 +56,11 @@ private fun AddDownloadWindow(
     when (addDownloadComponent) {
         is BaseAddSingleDownloadComponent -> {
             val credentials by addDownloadComponent.credentials.collectAsState()
-            val isYouTube = remember(credentials.link) {
-                com.abdownloadmanager.desktop.youtube.YouTubeVideoService.isYouTubeUrl(credentials.link)
+            var wasYouTube by remember { mutableStateOf(false) }
+            if (com.abdownloadmanager.desktop.youtube.YouTubeVideoService.isYouTubeUrl(credentials.link)) {
+                wasYouTube = true
             }
+            val isYouTube = wasYouTube
             val h = (if (isYouTube) 380 else 265).applyUiScale(uiScale)
             val w = (if (isYouTube) 560 else 500).applyUiScale(uiScale)
             val size = remember(isYouTube) {
