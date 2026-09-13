@@ -18,10 +18,12 @@ import ir.amirab.downloader.downloaditem.http.HttpDownloadItem
 import ir.amirab.downloader.downloaditem.http.HttpDownloadJob
 import ir.amirab.downloader.downloaditem.http.HttpDownloader
 import ir.amirab.downloader.downloaditem.http.IHttpDownloadCredentials
+import ir.amirab.downloader.downloaditem.DownloadJobStatus
 import ir.amirab.downloader.monitor.ProcessingDownloadItemFactoryInputs
 import ir.amirab.downloader.monitor.ProcessingDownloadItemState
 import ir.amirab.downloader.monitor.RangeBasedProcessingDownloadItemState
 import ir.amirab.downloader.monitor.UiRangedPart
+import ir.amirab.downloader.part.PartDownloadStatus
 import ir.amirab.util.HttpUrlUtils
 import ir.amirab.util.compose.StringSource
 import ir.amirab.util.compose.asStringSource
@@ -117,6 +119,30 @@ class HttpDownloaderInUi(
         val downloadJobStatus = downloadJob.status.value
         val parts = downloadJob.getParts()
         val contentLength = downloadItem.contentLength
+        val uiParts = if (parts.isNotEmpty()) {
+            parts.map {
+                UiRangedPart.fromPart(
+                    part = it,
+                    totalLength = contentLength,
+                )
+            }
+        } else if (downloadJob.customDownloadedSize != null || downloadJobStatus is DownloadJobStatus.IsActive) {
+            val currentProgress = downloadJob.customDownloadedSize ?: 0L
+            val pct = if (contentLength > 0) ((currentProgress.toDouble() / contentLength.toDouble()) * 100).toInt().coerceIn(0, 100) else null
+            listOf(
+                UiRangedPart(
+                    id = 1,
+                    status = PartDownloadStatus.ReceivingData,
+                    howMuchProceed = currentProgress,
+                    percent = pct,
+                    length = if (contentLength > 0) contentLength else null,
+                    partSpace = 1f,
+                )
+            )
+        } else {
+            emptyList()
+        }
+
         return RangeBasedProcessingDownloadItemState(
             id = downloadItem.id,
             folder = downloadItem.folder,
@@ -127,14 +153,9 @@ class HttpDownloaderInUi(
             completeTime = downloadItem.completeTime ?: -1,
             status = downloadJobStatus,
             saveLocation = downloadItem.name,
-            parts = parts.map {
-                UiRangedPart.fromPart(
-                    part = it,
-                    totalLength = contentLength,
-                )
-            },
+            parts = uiParts,
             speed = props.speed,
-            supportResume = downloadJob.supportsConcurrent,
+            supportResume = downloadJob.supportsConcurrent ?: true,
             downloadLink = downloadItem.link,
             isWaiting = props.isWaiting,
         )

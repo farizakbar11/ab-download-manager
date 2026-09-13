@@ -95,7 +95,14 @@ object YouTubeVideoService {
             val audioStreams = raw.formats.filter {
                 it.acodec != null && it.acodec != "none" && (it.vcodec == null || it.vcodec == "none")
             }
-            val bestAudio = audioStreams.maxByOrNull { it.tbr ?: (it.filesize?.toDouble() ?: 0.0) }
+            val bestAudio = audioStreams
+                .sortedWith(
+                    compareByDescending<YtDlpRawFormat> { it.ext == "m4a" }
+                        .thenByDescending { it.filesize != null || it.filesizeApprox != null }
+                        .thenByDescending { it.filesize ?: it.filesizeApprox ?: 0.0 }
+                        .thenByDescending { it.tbr ?: it.abr ?: 0.0 }
+                )
+                .firstOrNull()
 
             val options = mutableListOf<YouTubeFormatOption>()
 
@@ -106,10 +113,15 @@ object YouTubeVideoService {
 
             val heights = listOf(2160, 1440, 1080, 720, 480, 360)
             for (h in heights) {
-                // Find matching video format, prefer mp4
+                // Find matching video format: prefer native mp4 with real filesize, then others
                 val matching = videoStreams
                     .filter { it.height?.toInt() == h }
-                    .sortedWith(compareByDescending<YtDlpRawFormat> { it.ext == "mp4" }.thenByDescending { it.tbr ?: 0.0 })
+                    .sortedWith(
+                        compareByDescending<YtDlpRawFormat> { it.ext == "mp4" && (it.filesize != null || it.filesizeApprox != null) }
+                            .thenByDescending { it.ext == "mp4" }
+                            .thenByDescending { it.filesize != null || it.filesizeApprox != null }
+                            .thenByDescending { it.tbr ?: it.vbr ?: 0.0 }
+                    )
                     .firstOrNull() ?: continue
 
                 val isSeparateAudio = matching.acodec == null || matching.acodec == "none"
@@ -274,36 +286,55 @@ object YouTubeVideoService {
             val mergerRegex = Regex("""\[Merger\]""")
             val reader = process.inputStream.bufferedReader(Charsets.UTF_8)
             var line: String?
+            var lastStreamDownloaded = 0L
+            var accumulatedDownloaded = 0L
+            var currentStreamTotal = 0L
+            val targetTotal = if (format.estimatedSizeBytes > 0) format.estimatedSizeBytes else 0L
 
             while (reader.readLine().also { line = it } != null) {
                 val currentLine = line ?: continue
                 logger.d { "yt-dlp: $currentLine" }
                 if (mergerRegex.containsMatchIn(currentLine)) {
+                    val finalMergedBytes = if (targetTotal > 0) (targetTotal * 0.99).toLong() else accumulatedDownloaded
                     onProgress(
                         YouTubeDownloadProgress(
                             percent = 99f,
                             statusText = "Menggabungkan video & audio (FFmpeg)...",
                             isRunning = true,
+                            downloadedBytes = finalMergedBytes,
+                            totalBytes = targetTotal,
                         )
                     )
+                } else if (currentLine.startsWith("[download] Destination:")) {
+                    accumulatedDownloaded += lastStreamDownloaded
+                    lastStreamDownloaded = 0L
+                    currentStreamTotal = 0L
                 } else {
                     val match = downloadRegex.find(currentLine)
                     if (match != null) {
                         val (pctStr, sizeStr, speedStr, etaStr) = match.destructured
                         val pct = pctStr.toFloatOrNull() ?: 0f
-                        val isAudioStage = currentLine.contains(".f") || currentLine.contains("audio") || format.isAudioOnly
-                        val total = parseSizeToBytes(sizeStr)
-                        val downloaded = if (total > 0) (total * (pct / 100.0)).toLong() else 0L
+                        currentStreamTotal = parseSizeToBytes(sizeStr)
+                        val streamCurrent = if (currentStreamTotal > 0) (currentStreamTotal * (pct / 100.0)).toLong() else 0L
+                        lastStreamDownloaded = streamCurrent
+
+                        val totalBytesExpected = if (targetTotal > 0) targetTotal else (accumulatedDownloaded + currentStreamTotal)
+                        val totalBytesSoFar = (accumulatedDownloaded + streamCurrent).coerceAtMost(totalBytesExpected)
+
+                        val overallPercent = if (totalBytesExpected > 0) {
+                            ((totalBytesSoFar.toDouble() / totalBytesExpected.toDouble()) * 100.0).toFloat().coerceIn(0f, 99f)
+                        } else pct
+
                         onProgress(
                             YouTubeDownloadProgress(
-                                percent = pct,
+                                percent = overallPercent,
                                 sizeStr = sizeStr,
                                 speedStr = speedStr,
                                 etaStr = etaStr,
-                                statusText = if (isAudioStage) "Mengunduh audio..." else "Mengunduh video...",
+                                statusText = if (accumulatedDownloaded > 0) "Mengunduh audio..." else "Mengunduh video...",
                                 isRunning = true,
-                                downloadedBytes = downloaded,
-                                totalBytes = total,
+                                downloadedBytes = totalBytesSoFar,
+                                totalBytes = totalBytesExpected,
                             )
                         )
                     }
