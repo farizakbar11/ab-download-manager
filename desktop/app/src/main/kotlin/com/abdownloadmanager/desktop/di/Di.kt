@@ -651,6 +651,7 @@ val appModule = module {
         val appHostNameVerifier: AppHostNameVerifier = get()
         OkHttpClient
             .Builder()
+            .connectionPool(okhttp3.ConnectionPool(64, 5, java.util.concurrent.TimeUnit.MINUTES))
             .dispatcher(Dispatcher().apply {
                 //bypass limit on concurrent connections!
                 maxRequests = Int.MAX_VALUE

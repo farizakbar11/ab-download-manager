@@ -253,7 +253,7 @@ abstract class PartDownloader<
         val buffer = Buffer()
         var totalReadCount = 0L
         var firstLoop = true
-        val bufferSize = DEFAULT_BUFFER_SIZE.toLong()
+        val bufferSize = 64 * 1024L
         while (true) {
             if (stop || Thread.currentThread().isInterrupted) {
                 onCanceled(kotlinx.coroutines.CancellationException())

@@ -96,7 +96,7 @@ class SegmentedDownloadDestination(
         DownloadDestination.prepareDestinationFolder(outputFile)
         val totalLength = sources.sumOf { it.length() }
         var totalWritten = 0L
-        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        val buffer = ByteArray(256 * 1024)
         var percent = 0
         destination.outputStream().use { dst ->
             sources.forEach { sourceFile ->
