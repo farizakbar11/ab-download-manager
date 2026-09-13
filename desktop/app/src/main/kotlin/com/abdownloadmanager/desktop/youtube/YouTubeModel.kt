@@ -25,6 +25,18 @@ data class YouTubeVideoInfo(
     val defaultFormat: YouTubeFormatOption?,
 )
 
+data class YouTubeDownloadProgress(
+    val percent: Float = 0f,
+    val sizeStr: String = "",
+    val speedStr: String = "",
+    val etaStr: String = "",
+    val statusText: String = "",
+    val isRunning: Boolean = false,
+    val isCompleted: Boolean = false,
+    val error: String? = null,
+    val outputFile: java.io.File? = null,
+)
+
 @Serializable
 data class YtDlpRawFormat(
     @SerialName("format_id") val formatId: String = "",

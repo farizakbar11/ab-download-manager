@@ -201,6 +201,124 @@ object YouTubeVideoService {
         }
     }
 
+    @Volatile
+    private var activeDownloadProcess: Process? = null
+
+    fun cancelActiveDownload() {
+        try {
+            activeDownloadProcess?.destroyForcibly()
+        } catch (_: Exception) {}
+        activeDownloadProcess = null
+    }
+
+    /**
+     * Downloads YouTube video using yt-dlp with real-time progress.
+     */
+    suspend fun downloadVideoWithYtDlp(
+        videoUrl: String,
+        format: YouTubeFormatOption,
+        targetFile: File,
+        onProgress: (YouTubeDownloadProgress) -> Unit,
+    ): Result<File> = withContext(Dispatchers.IO) {
+        runCatching {
+            logger.d { "Starting yt-dlp download for $videoUrl into ${targetFile.absolutePath}" }
+            val formatSelector = if (format.isAudioOnly) {
+                "bestaudio/best"
+            } else if (format.isDASH) {
+                "${format.formatId}+bestaudio/best"
+            } else {
+                format.formatId
+            }
+
+            targetFile.parentFile?.mkdirs()
+
+            val finalTargetFile = if (targetFile.extension.isBlank()) {
+                File(targetFile.parentFile, "${targetFile.name}.${format.extension}")
+            } else {
+                targetFile
+            }
+
+            val pb = ProcessBuilder(
+                "yt-dlp",
+                "--newline",
+                "--no-mtime",
+                "-f", formatSelector,
+                "--merge-output-format", "mp4",
+                "-o", finalTargetFile.absolutePath,
+                videoUrl
+            )
+            pb.redirectErrorStream(true)
+            val process = pb.start()
+            activeDownloadProcess = process
+
+            val downloadRegex = Regex("""\[download\]\s+([\d\.]+)%\s+of\s+([^\s]+)\s+at\s+([^\s]+)\s+ETA\s+([^\s]+)""")
+            val mergerRegex = Regex("""\[Merger\]""")
+            val reader = process.inputStream.bufferedReader(Charsets.UTF_8)
+            var line: String?
+
+            while (reader.readLine().also { line = it } != null) {
+                val currentLine = line ?: continue
+                logger.d { "yt-dlp: $currentLine" }
+                if (mergerRegex.containsMatchIn(currentLine)) {
+                    onProgress(
+                        YouTubeDownloadProgress(
+                            percent = 99f,
+                            statusText = "Menggabungkan video & audio (FFmpeg)...",
+                            isRunning = true,
+                        )
+                    )
+                } else {
+                    val match = downloadRegex.find(currentLine)
+                    if (match != null) {
+                        val (pctStr, sizeStr, speedStr, etaStr) = match.destructured
+                        val pct = pctStr.toFloatOrNull() ?: 0f
+                        val isAudioStage = currentLine.contains(".f") || currentLine.contains("audio") || format.isAudioOnly
+                        onProgress(
+                            YouTubeDownloadProgress(
+                                percent = pct,
+                                sizeStr = sizeStr,
+                                speedStr = speedStr,
+                                etaStr = etaStr,
+                                statusText = if (isAudioStage) "Mengunduh audio..." else "Mengunduh video...",
+                                isRunning = true,
+                            )
+                        )
+                    }
+                }
+            }
+
+            val exitCode = process.waitFor()
+            activeDownloadProcess = null
+
+            if (exitCode != 0) {
+                error("Proses unduh dibatalkan atau gagal (kode keluar: $exitCode)")
+            }
+
+            val actualFile = if (finalTargetFile.exists()) {
+                finalTargetFile
+            } else {
+                val alternateMp4 = File(finalTargetFile.parentFile, finalTargetFile.nameWithoutExtension + ".mp4")
+                if (alternateMp4.exists()) {
+                    alternateMp4
+                } else {
+                    finalTargetFile
+                }
+            }
+
+            onProgress(
+                YouTubeDownloadProgress(
+                    percent = 100f,
+                    statusText = "Unduhan Selesai!",
+                    isRunning = false,
+                    isCompleted = true,
+                    outputFile = actualFile,
+                )
+            )
+
+            actualFile
+        }
+    }
+
     private fun sanitizeFileName(name: String): String {
         return name.replace(Regex("[\\\\/:*?\"<>|]"), " ").trim()
     }
