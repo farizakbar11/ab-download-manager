@@ -7,10 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.onClick
 import androidx.compose.foundation.window.WindowDraggableArea
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,6 +57,10 @@ fun AddDownloadPage(
             .padding(top = 8.dp, bottom = 16.dp)
     ) {
         val credentials by component.credentials.collectAsState()
+        val isYouTube = com.abdownloadmanager.desktop.youtube.YouTubeVideoService.isYouTubeUrl(credentials.link)
+        var youTubeDownloadTrigger by remember { mutableStateOf<(() -> Unit)?>(null) }
+        var isYouTubeDownloading by remember { mutableStateOf(false) }
+
         fun setLink(link: String) {
             component.setCredentials(
                 credentials.copy(link = Some(link))
@@ -97,6 +98,12 @@ fun AddDownloadPage(
                 val cleanTitle = videoTitle.replace(Regex("[\\\\/:*?\"<>|]"), " ").trim()
                 val suggestedFileName = "$cleanTitle [${format.resolutionLabel.split(" ").first()}].$cleanExt"
                 component.setName(suggestedFileName)
+            },
+            onDownloadReady = { trigger ->
+                youTubeDownloadTrigger = trigger
+            },
+            onDownloadingStateChanged = { downloading ->
+                isYouTubeDownloading = downloading
             },
             onCloseRequested = {
                 component.onRequestClose()
@@ -205,7 +212,12 @@ fun AddDownloadPage(
             }
         }
         Spacer(Modifier.weight(1f))
-        MainActionButtons(component)
+        MainActionButtons(
+            component = component,
+            isYouTube = isYouTube,
+            isYouTubeDownloading = isYouTubeDownloading,
+            onStartYouTubeDownload = youTubeDownloadTrigger,
+        )
         if (component.showSolutionsOnDuplicateDownloadUi) {
             ShowSolutionsOnDuplicateDownload(component)
         }
@@ -456,8 +468,16 @@ fun ConfigActionsButtons(component: BaseAddSingleDownloadComponent) {
 }
 
 @Composable
-private fun MainActionButtons(component: BaseAddSingleDownloadComponent) {
-    Row {
+private fun MainActionButtons(
+    component: BaseAddSingleDownloadComponent,
+    isYouTube: Boolean = false,
+    isYouTubeDownloading: Boolean = false,
+    onStartYouTubeDownload: (() -> Unit)? = null,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()
+    ) {
         val onDuplicateStrategy by component.onDuplicateStrategy.collectAsState()
         val canAddResult by component.canAddResult.collectAsState()
         if (canAddResult is CanAddResult.DownloadAlreadyExists && onDuplicateStrategy == null) {
@@ -476,25 +496,37 @@ private fun MainActionButtons(component: BaseAddSingleDownloadComponent) {
             }
         } else {
             val canAddToDownloads by component.canAddToDownloads.collectAsState()
-            ActionButton(
-                text = myStringResource(Res.string.add),
-                modifier = Modifier,
-                enabled = canAddToDownloads,
-                onClick = {
-                    component.selectQueueComponent.openAddToQueueDialog()
-                },
-                onLongClick = {
-                    component.selectQueueComponent.fastConfirm()
-                }
+            if (!isYouTube) {
+                ActionButton(
+                    text = myStringResource(Res.string.add),
+                    modifier = Modifier,
+                    enabled = canAddToDownloads,
+                    onClick = {
+                        component.selectQueueComponent.openAddToQueueDialog()
+                    },
+                    onLongClick = {
+                        component.selectQueueComponent.fastConfirm()
+                    }
+                )
+                Spacer(Modifier.width(8.dp))
+            }
 
-            )
-            Spacer(Modifier.width(8.dp))
+            val isDownloadEnabled = if (isYouTube) {
+                !isYouTubeDownloading && onStartYouTubeDownload != null
+            } else {
+                canAddToDownloads
+            }
+
             PrimaryMainActionButton(
-                text = myStringResource(Res.string.download),
+                text = if (isYouTube && isYouTubeDownloading) "Mengunduh..." else myStringResource(Res.string.download),
                 modifier = Modifier,
-                enabled = canAddToDownloads,
+                enabled = isDownloadEnabled,
                 onClick = {
-                    component.onRequestDownload()
+                    if (isYouTube && onStartYouTubeDownload != null) {
+                        onStartYouTubeDownload()
+                    } else {
+                        component.onRequestDownload()
+                    }
                 },
             )
             if (onDuplicateStrategy != null) {
@@ -505,15 +537,16 @@ private fun MainActionButtons(component: BaseAddSingleDownloadComponent) {
                     onClick = { component.showSolutionsOnDuplicateDownloadUi = true },
                 )
             }
-
         }
-        //        Spacer(Modifier.weight(1f))
         Spacer(Modifier.weight(1f))
 
         ActionButton(
             text = myStringResource(Res.string.cancel),
             modifier = Modifier,
             onClick = {
+                if (isYouTube) {
+                    com.abdownloadmanager.desktop.youtube.YouTubeVideoService.cancelActiveDownload()
+                }
                 component.onRequestClose()
             },
         )

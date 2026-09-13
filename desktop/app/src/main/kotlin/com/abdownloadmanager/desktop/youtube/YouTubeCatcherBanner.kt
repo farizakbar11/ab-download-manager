@@ -1,13 +1,10 @@
 package com.abdownloadmanager.desktop.youtube
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,8 +13,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.abdownloadmanager.desktop.pages.addDownload.shared.DialogDropDown
 import com.abdownloadmanager.shared.ui.widget.Text
 import com.abdownloadmanager.shared.util.ui.WithContentAlpha
 import com.abdownloadmanager.shared.util.ui.icon.MyIcons
@@ -35,6 +34,8 @@ fun YouTubeCatcherBanner(
     targetFolder: String = "",
     targetFileName: String = "",
     onFormatSelected: (format: YouTubeFormatOption, videoTitle: String) -> Unit,
+    onDownloadReady: (((() -> Unit)?) -> Unit)? = null,
+    onDownloadingStateChanged: ((Boolean) -> Unit)? = null,
     onCloseRequested: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -55,6 +56,7 @@ fun YouTubeCatcherBanner(
     var videoInfo by remember { mutableStateOf<YouTubeVideoInfo?>(null) }
     var selectedFormat by remember { mutableStateOf<YouTubeFormatOption?>(null) }
     var downloadProgress by remember { mutableStateOf<YouTubeDownloadProgress?>(null) }
+    var isDropdownOpen by remember { mutableStateOf(false) }
 
     // Auto-resolve when valid YouTube URL is detected
     LaunchedEffect(ytUrl) {
@@ -63,6 +65,7 @@ fun YouTubeCatcherBanner(
         videoInfo = null
         selectedFormat = null
         downloadProgress = null
+        onDownloadReady?.invoke(null)
         val result = YouTubeVideoService.resolveVideo(ytUrl)
         isLoading = false
         result.onSuccess { info ->
@@ -75,6 +78,55 @@ fun YouTubeCatcherBanner(
         }.onFailure { err ->
             errorMessage = err.message ?: "Gagal mengambil info YouTube"
         }
+    }
+
+    // Function to perform download
+    val performDownload = remember(selectedFormat, videoInfo, targetFolder, targetFileName, ytUrl) {
+        val fmt = selectedFormat
+        val info = videoInfo
+        if (fmt != null && info != null) {
+            {
+                scope.launch {
+                    val destinationDir = if (targetFolder.isNotBlank()) File(targetFolder) else File(System.getProperty("user.home"), "Downloads")
+                    val cleanTitle = info.title.replace(Regex("[\\\\/:*?\"<>|]"), " ").trim()
+                    val resTag = fmt.resolutionLabel.split(" ").first()
+                    val defaultFileName = "$cleanTitle [$resTag].${fmt.extension}"
+                    val finalName = if (targetFileName.isNotBlank()) targetFileName else defaultFileName
+                    val targetFile = File(destinationDir, finalName)
+
+                    downloadProgress = YouTubeDownloadProgress(
+                        isRunning = true,
+                        statusText = "Menyiapkan download..."
+                    )
+                    onDownloadingStateChanged?.invoke(true)
+
+                    val res = YouTubeVideoService.downloadVideoWithYtDlp(
+                        videoUrl = ytUrl,
+                        format = fmt,
+                        targetFile = targetFile,
+                        onProgress = { p ->
+                            downloadProgress = p
+                        }
+                    )
+
+                    onDownloadingStateChanged?.invoke(false)
+                    res.onFailure { err ->
+                        downloadProgress = YouTubeDownloadProgress(
+                            isRunning = false,
+                            isCompleted = false,
+                            error = err.message ?: "Gagal mengunduh video"
+                        )
+                    }
+                }
+                Unit
+            }
+        } else {
+            null
+        }
+    }
+
+    LaunchedEffect(performDownload) {
+        onDownloadReady?.invoke(performDownload)
     }
 
     val bannerShape = myShapes.defaultRounded
@@ -90,12 +142,11 @@ fun YouTubeCatcherBanner(
             .background(youtubeRed.copy(alpha = 0.06f))
             .padding(14.dp)
     ) {
-        // Header Row: YouTube Catcher Badge & Status
+        // Header Row: YouTube Catcher Badge & Channel
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
         ) {
-            // YouTube Icon Badge
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -104,7 +155,7 @@ fun YouTubeCatcherBanner(
                     .padding(horizontal = 8.dp, vertical = 3.dp)
             ) {
                 Text(
-                    text = "YouTube Catcher (yt-dlp Engine)",
+                    text = "YouTube Catcher",
                     color = Color.White,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
@@ -154,6 +205,7 @@ fun YouTubeCatcherBanner(
                                 isLoading = true
                                 errorMessage = null
                                 downloadProgress = null
+                                onDownloadReady?.invoke(null)
                                 val res = YouTubeVideoService.resolveVideo(ytUrl)
                                 isLoading = false
                                 res.onSuccess { info ->
@@ -194,72 +246,63 @@ fun YouTubeCatcherBanner(
 
             Spacer(Modifier.height(10.dp))
 
-            // Formats Chips Row
+            // Resolution Dropdown Selector
             Text(
-                text = "Pilih Resolusi / Kualitas:",
+                text = "Pilih Kualitas Video:",
                 fontSize = myTextSizes.sm,
                 fontWeight = FontWeight.Medium,
             )
 
             Spacer(Modifier.height(6.dp))
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-            ) {
-                for (fmt in info.formats) {
-                    val isSelected = selectedFormat == fmt
-                    val chipShape = RoundedCornerShape(6.dp)
-
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .clip(chipShape)
-                            .border(
-                                width = if (isSelected) 1.5.dp else 1.dp,
-                                color = if (isSelected) youtubeRed else myColors.onBackground.copy(alpha = 0.2f),
-                                shape = chipShape
-                            )
-                            .background(
-                                if (isSelected) youtubeRed.copy(alpha = 0.15f) else Color.Transparent
-                            )
-                            .clickable(enabled = !isDownloading) {
-                                selectedFormat = fmt
-                                onFormatSelected(fmt, info.title)
-                            }
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+            DialogDropDown(
+                selectedItem = selectedFormat,
+                possibleItems = info.formats,
+                onItemSelected = { fmt ->
+                    selectedFormat = fmt
+                    onFormatSelected(fmt, info.title)
+                },
+                enabled = !isDownloading,
+                renderItem = { fmt ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = fmt.resolutionLabel,
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSelected) youtubeRed else myColors.onBackground
-                            )
-                            if (fmt.estimatedSizeBytes > 0) {
-                                Spacer(Modifier.width(4.dp))
-                                WithContentAlpha(0.6f) {
-                                    Text(
-                                        text = "(${formatByteSize(fmt.estimatedSizeBytes)})",
-                                        fontSize = 10.sp,
-                                    )
-                                }
+                        Text(
+                            text = fmt.resolutionLabel,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = myColors.onBackground,
+                        )
+                        if (fmt.estimatedSizeBytes > 0) {
+                            Spacer(Modifier.width(8.dp))
+                            WithContentAlpha(0.6f) {
+                                Text(
+                                    text = "• ${formatByteSize(fmt.estimatedSizeBytes)}",
+                                    fontSize = 12.sp,
+                                )
                             }
                         }
                     }
-                }
-            }
+                },
+                dropdownOpen = isDropdownOpen,
+                onRequestCloseDropDown = { isDropdownOpen = false },
+                onRequestOpenDropDown = { isDropdownOpen = true },
+                renderEmpty = {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Text("Tidak ada format")
+                    }
+                },
+                dropDownSize = DpSize(340.dp, 250.dp),
+                modifier = Modifier.fillMaxWidth(),
+            )
 
-            Spacer(Modifier.height(12.dp))
-
-            // Download Action / Progress Section
+            // Progress / Status UI (Only active when downloading or completed)
             if (isDownloading) {
+                Spacer(Modifier.height(12.dp))
                 val currentProgress = downloadProgress
                 val animatedProgress by animateFloatAsState(
                     targetValue = ((currentProgress?.percent ?: 0f) / 100f).coerceIn(0f, 1f)
@@ -343,6 +386,7 @@ fun YouTubeCatcherBanner(
                                 .clickable {
                                     YouTubeVideoService.cancelActiveDownload()
                                     downloadProgress = null
+                                    onDownloadingStateChanged?.invoke(false)
                                 }
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                         ) {
@@ -356,6 +400,7 @@ fun YouTubeCatcherBanner(
                     }
                 }
             } else if (isCompleted) {
+                Spacer(Modifier.height(12.dp))
                 // Completed UI
                 Column(
                     modifier = Modifier
@@ -493,76 +538,13 @@ fun YouTubeCatcherBanner(
                     }
                 }
             } else {
-                // Idle state: Prominent Download Button
-                selectedFormat?.let { fmt ->
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(youtubeRed)
-                            .clickable {
-                                scope.launch {
-                                    val destinationDir = if (targetFolder.isNotBlank()) File(targetFolder) else File(System.getProperty("user.home"), "Downloads")
-                                    val cleanTitle = info.title.replace(Regex("[\\\\/:*?\"<>|]"), " ").trim()
-                                    val resTag = fmt.resolutionLabel.split(" ").first()
-                                    val defaultFileName = "$cleanTitle [$resTag].${fmt.extension}"
-                                    val finalName = if (targetFileName.isNotBlank()) targetFileName else defaultFileName
-                                    val targetFile = File(destinationDir, finalName)
-
-                                    downloadProgress = YouTubeDownloadProgress(
-                                        isRunning = true,
-                                        statusText = "Menyiapkan download..."
-                                    )
-
-                                    val res = YouTubeVideoService.downloadVideoWithYtDlp(
-                                        videoUrl = ytUrl,
-                                        format = fmt,
-                                        targetFile = targetFile,
-                                        onProgress = { p ->
-                                            downloadProgress = p
-                                        }
-                                    )
-
-                                    res.onFailure { err ->
-                                        downloadProgress = YouTubeDownloadProgress(
-                                            isRunning = false,
-                                            isCompleted = false,
-                                            error = err.message ?: "Gagal mengunduh video"
-                                        )
-                                    }
-                                }
-                            }
-                            .padding(vertical = 10.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            MyIcon(
-                                icon = MyIcons.download,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = Color.White
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = "Unduh Video Sekarang (${fmt.resolutionLabel.split(" ").first()}) - yt-dlp",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
-                            )
-                        }
-                    }
-
-                    downloadProgress?.error?.let { err ->
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = err,
-                            color = myColors.error,
-                            fontSize = 12.sp
-                        )
-                    }
+                downloadProgress?.error?.let { err ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = err,
+                        color = myColors.error,
+                        fontSize = 12.sp
+                    )
                 }
             }
         }
