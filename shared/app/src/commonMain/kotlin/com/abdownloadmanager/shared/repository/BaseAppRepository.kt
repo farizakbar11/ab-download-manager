@@ -43,6 +43,7 @@ open class BaseAppRepository(
     val useSparseFileAllocation = appSettings.useSparseFileAllocation
     val maxDownloadRetryCount = appSettings.maxDownloadRetryCount
     val useAverageSpeed = appSettings.useAverageSpeed
+    val speedUpdateInterval = appSettings.speedUpdateInterval
     val saveLocation = appSettings.defaultDownloadFolder
     val apiEnabled = appSettings.apiEnabled
     val apiPort = appSettings.apiPort
@@ -113,6 +114,11 @@ open class BaseAppRepository(
             .debounce(500.milliseconds)
             .onEach {
                 downloadMonitor.useAverageSpeed = it
+            }.launchIn(scope)
+        speedUpdateInterval
+            .debounce(500.milliseconds)
+            .onEach {
+                downloadMonitor.speedUpdateIntervalMs = it.toLong()
             }.launchIn(scope)
         threadCount
             .debounce(500.milliseconds)

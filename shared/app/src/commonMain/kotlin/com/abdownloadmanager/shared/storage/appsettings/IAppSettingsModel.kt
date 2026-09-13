@@ -24,6 +24,7 @@ interface IAppSettingsModel {
     val appendExtensionToIncompleteDownloads: Boolean
     val useSparseFileAllocation: Boolean
     val useAverageSpeed: Boolean
+    val speedUpdateInterval: Int
     val showDownloadProgressDialog: Boolean
     val showDownloadCompletionDialog: Boolean
     val speedLimit: Long

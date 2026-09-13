@@ -26,6 +26,7 @@ interface BaseAppSettingsStorage :
     val appendExtensionToIncompleteDownloads: MutableStateFlow<Boolean>
     val useSparseFileAllocation: MutableStateFlow<Boolean>
     val useAverageSpeed: MutableStateFlow<Boolean>
+    val speedUpdateInterval: MutableStateFlow<Int>
     val maxDownloadRetryCount: MutableStateFlow<Int>
     val showDownloadProgressDialog: MutableStateFlow<Boolean>
     val showDownloadCompletionDialog: MutableStateFlow<Boolean>

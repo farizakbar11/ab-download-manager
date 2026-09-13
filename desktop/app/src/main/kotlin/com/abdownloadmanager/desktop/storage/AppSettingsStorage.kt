@@ -61,6 +61,7 @@ class AppSettingsStorage(
     override val appendExtensionToIncompleteDownloads = from(AppSettingsModel.appendExtensionToIncompleteDownloads)
     override val useSparseFileAllocation = from(AppSettingsModel.useSparseFileAllocation)
     override val useAverageSpeed = from(AppSettingsModel.useAverageSpeed)
+    override val speedUpdateInterval = from(AppSettingsModel.speedUpdateInterval)
     override val maxDownloadRetryCount = from(AppSettingsModel.maxDownloadRetryCount)
     override val showDownloadProgressDialog = from(AppSettingsModel.showDownloadProgressDialog)
     override val showDownloadCompletionDialog = from(AppSettingsModel.showDownloadCompletionDialog)

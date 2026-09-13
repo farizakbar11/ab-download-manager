@@ -102,6 +102,7 @@ class DesktopSettingsComponent(
                             CommonSettings.sizeUnit(appRepository, scope),
                             CommonSettings.speedUnit(appRepository, scope),
                             CommonSettings.useAverageSpeedConfig(appRepository),
+                            CommonSettings.speedUpdateIntervalConfig(appRepository),
                         )
                     ),
                     ConfigurableGroup(

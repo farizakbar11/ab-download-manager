@@ -30,6 +30,12 @@ class DownloadMonitor(
     private val scope = CoroutineScope(SupervisorJob())
 
     private var avSpeedCollectorJob: Job? = null
+    override var speedUpdateIntervalMs = 100L
+        set(value) {
+            val clamped = value.coerceIn(50L, 5000L)
+            if (clamped == field) return
+            field = clamped
+        }
     override var useAverageSpeed = false
         set(value) {
             if (value == field) return
@@ -112,7 +118,7 @@ class DownloadMonitor(
             var lastWrites = mapOf<Long, Long>()
             var lastTime = System.currentTimeMillis()
             while (isActive) {
-                delay(100.milliseconds)
+                delay(speedUpdateIntervalMs.coerceIn(50L, 5000L).milliseconds)
                 val currentTime = System.currentTimeMillis()
                 val elapsedMs = (currentTime - lastTime).coerceAtLeast(1L)
                 val newWrites = downloadManager.downloadJobs.associate {

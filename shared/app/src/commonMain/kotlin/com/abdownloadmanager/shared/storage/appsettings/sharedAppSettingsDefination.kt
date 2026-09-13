@@ -44,6 +44,7 @@ object BaseAppSettingsDefinition {
         prop(IAppSettingsModel::useSparseFileAllocation) bind S.boolean()
             .catch(PlatformDefaultSettings::useSparseFileAllocation)
         prop(IAppSettingsModel::useAverageSpeed) bind S.boolean().catch(PlatformDefaultSettings::useAverageSpeed)
+        prop(IAppSettingsModel::speedUpdateInterval) bind S.int().range(50, 5000).catch(PlatformDefaultSettings::speedUpdateInterval)
         prop(IAppSettingsModel::showDownloadProgressDialog) bind S.boolean()
             .catch(PlatformDefaultSettings::showDownloadProgressDialog)
         prop(IAppSettingsModel::showDownloadCompletionDialog) bind S.boolean()

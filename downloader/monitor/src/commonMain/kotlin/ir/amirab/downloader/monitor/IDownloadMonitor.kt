@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 interface IDownloadMonitor {
     var useAverageSpeed: Boolean
+    var speedUpdateIntervalMs: Long
     val activeDownloadListFlow: StateFlow<List<ProcessingDownloadItemState>>
     val completedDownloadListFlow: StateFlow<List<CompletedDownloadItemState>>
     val downloadListFlow: StateFlow<List<IDownloadItemState>>

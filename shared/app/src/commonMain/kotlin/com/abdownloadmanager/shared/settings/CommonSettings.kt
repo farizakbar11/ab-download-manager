@@ -363,6 +363,24 @@ object CommonSettings {
         )
     }
 
+    fun speedUpdateIntervalConfig(appRepository: BaseAppRepository): IntConfigurable {
+        return IntConfigurable(
+            title = Res.string.settings_speed_update_interval.asStringSource(),
+            description = Res.string.settings_speed_update_interval_description.asStringSource(),
+            backedBy = appRepository.speedUpdateInterval,
+            range = 50..5000,
+            renderMode = IntConfigurable.RenderMode.TextField,
+            describe = {
+                Res.string.settings_speed_update_interval_describe
+                    .asStringSourceWithARgs(
+                        Res.string.settings_speed_update_interval_describe_createArgs(
+                            count = it.toString()
+                        )
+                    )
+            }
+        )
+    }
+
     fun defaultDownloadFolderConfig(appSettings: BaseAppSettingsStorage): FolderConfigurable {
         return FolderConfigurable(
             title = Res.string.settings_default_download_folder.asStringSource(),

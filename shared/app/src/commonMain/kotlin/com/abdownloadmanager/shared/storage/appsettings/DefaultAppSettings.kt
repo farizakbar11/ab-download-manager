@@ -23,6 +23,7 @@ abstract class DefaultAppSettings {
     open val appendExtensionToIncompleteDownloads: Boolean get() = false
     abstract val useSparseFileAllocation: Boolean
     open val useAverageSpeed: Boolean get() = true
+    open val speedUpdateInterval: Int get() = 100
     open val showDownloadProgressDialog: Boolean get() = true
     open val showDownloadCompletionDialog: Boolean get() = true
     open val speedLimit: Long get() = 0
