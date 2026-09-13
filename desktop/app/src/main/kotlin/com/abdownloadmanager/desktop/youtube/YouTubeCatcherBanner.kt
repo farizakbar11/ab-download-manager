@@ -16,7 +16,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.abdownloadmanager.desktop.pages.addDownload.shared.DialogDropDown
 import com.abdownloadmanager.shared.ui.widget.Text
 import com.abdownloadmanager.shared.util.ui.WithContentAlpha
 import com.abdownloadmanager.shared.util.ui.icon.MyIcons
@@ -255,50 +254,116 @@ fun YouTubeCatcherBanner(
 
             Spacer(Modifier.height(6.dp))
 
-            DialogDropDown(
-                selectedItem = selectedFormat,
-                possibleItems = info.formats,
-                onItemSelected = { fmt ->
-                    selectedFormat = fmt
-                    onFormatSelected(fmt, info.title)
-                },
-                enabled = !isDownloading,
-                renderItem = { fmt ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
+            Box(Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(myColors.surface)
+                        .border(
+                            1.dp,
+                            if (isDropdownOpen) myColors.primary else myColors.onBackground.copy(alpha = 0.15f),
+                            RoundedCornerShape(8.dp)
+                        )
+                        .clickable(enabled = !isDownloading) { isDropdownOpen = !isDropdownOpen }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val currentFmt = selectedFormat
+                    if (currentFmt != null) {
                         Text(
-                            text = fmt.resolutionLabel,
+                            text = currentFmt.resolutionLabel,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = myColors.onBackground,
                         )
-                        if (fmt.estimatedSizeBytes > 0) {
+                        if (currentFmt.estimatedSizeBytes > 0) {
                             Spacer(Modifier.width(8.dp))
                             WithContentAlpha(0.6f) {
                                 Text(
-                                    text = "• ${formatByteSize(fmt.estimatedSizeBytes)}",
+                                    text = "• ${YouTubeVideoService.formatByteSize(currentFmt.estimatedSizeBytes)}",
                                     fontSize = 12.sp,
                                 )
                             }
                         }
+                    } else {
+                        Text(
+                            text = "Pilih Resolusi...",
+                            fontSize = 13.sp,
+                            color = myColors.onBackground.copy(alpha = 0.6f),
+                        )
                     }
-                },
-                dropdownOpen = isDropdownOpen,
-                onRequestCloseDropDown = { isDropdownOpen = false },
-                onRequestOpenDropDown = { isDropdownOpen = true },
-                renderEmpty = {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.fillMaxSize()
+
+                    Spacer(Modifier.weight(1f))
+
+                    MyIcon(
+                        icon = if (isDropdownOpen) MyIcons.up else MyIcons.down,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = myColors.onBackground.copy(alpha = 0.7f),
+                    )
+                }
+
+                if (isDropdownOpen) {
+                    com.abdownloadmanager.shared.ui.widget.menu.custom.MyDropDown(
+                        onDismissRequest = { isDropdownOpen = false },
+                        anchor = Alignment.BottomStart,
+                        alignment = Alignment.TopStart,
                     ) {
-                        Text("Tidak ada format")
+                        Column(
+                            modifier = Modifier
+                                .widthIn(min = 320.dp, max = 460.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(myColors.surface)
+                                .border(1.dp, myColors.onBackground.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                .padding(vertical = 4.dp)
+                        ) {
+                            info.formats.forEach { fmt ->
+                                val isSelected = fmt.formatId == selectedFormat?.formatId
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            selectedFormat = fmt
+                                            onFormatSelected(fmt, info.title)
+                                            isDropdownOpen = false
+                                        }
+                                        .background(
+                                            if (isSelected) myColors.primary.copy(alpha = 0.12f) else Color.Transparent
+                                        )
+                                        .padding(horizontal = 14.dp, vertical = 9.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = fmt.resolutionLabel,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) myColors.primary else myColors.onBackground,
+                                    )
+                                    if (fmt.estimatedSizeBytes > 0) {
+                                        Spacer(Modifier.width(8.dp))
+                                        WithContentAlpha(0.6f) {
+                                            Text(
+                                                text = "• ${YouTubeVideoService.formatByteSize(fmt.estimatedSizeBytes)}",
+                                                fontSize = 12.sp,
+                                            )
+                                        }
+                                    }
+                                    Spacer(Modifier.weight(1f))
+                                    if (isSelected) {
+                                        MyIcon(
+                                            icon = MyIcons.check,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(14.dp),
+                                            tint = myColors.primary,
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
-                },
-                dropDownSize = DpSize(340.dp, 250.dp),
-                modifier = Modifier.fillMaxWidth(),
-            )
+                }
+            }
 
             // Progress / Status UI (Only active when downloading or completed)
             if (isDownloading) {

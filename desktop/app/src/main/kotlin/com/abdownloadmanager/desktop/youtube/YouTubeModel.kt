@@ -35,6 +35,8 @@ data class YouTubeDownloadProgress(
     val isCompleted: Boolean = false,
     val error: String? = null,
     val outputFile: java.io.File? = null,
+    val downloadedBytes: Long = 0L,
+    val totalBytes: Long = 0L,
 )
 
 @Serializable
@@ -50,6 +52,8 @@ data class YtDlpRawFormat(
     @SerialName("filesize") val filesize: Double? = null,
     @SerialName("filesize_approx") val filesizeApprox: Double? = null,
     @SerialName("tbr") val tbr: Double? = null,
+    @SerialName("vbr") val vbr: Double? = null,
+    @SerialName("abr") val abr: Double? = null,
     @SerialName("url") val url: String = "",
 )
 

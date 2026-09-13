@@ -58,8 +58,7 @@ fun AddDownloadPage(
     ) {
         val credentials by component.credentials.collectAsState()
         val isYouTube = com.abdownloadmanager.desktop.youtube.YouTubeVideoService.isYouTubeUrl(credentials.link)
-        var youTubeDownloadTrigger by remember { mutableStateOf<(() -> Unit)?>(null) }
-        var isYouTubeDownloading by remember { mutableStateOf(false) }
+        var youTubeSelectedFormat by remember { mutableStateOf<com.abdownloadmanager.desktop.youtube.YouTubeFormatOption?>(null) }
 
         fun setLink(link: String) {
             component.setCredentials(
@@ -94,16 +93,11 @@ fun AddDownloadPage(
             targetFolder = component.folder.collectAsState().value,
             targetFileName = component.name.collectAsState().value,
             onFormatSelected = { format, videoTitle ->
+                youTubeSelectedFormat = format
                 val cleanExt = format.extension
                 val cleanTitle = videoTitle.replace(Regex("[\\\\/:*?\"<>|]"), " ").trim()
                 val suggestedFileName = "$cleanTitle [${format.resolutionLabel.split(" ").first()}].$cleanExt"
                 component.setName(suggestedFileName)
-            },
-            onDownloadReady = { trigger ->
-                youTubeDownloadTrigger = trigger
-            },
-            onDownloadingStateChanged = { downloading ->
-                isYouTubeDownloading = downloading
             },
             onCloseRequested = {
                 component.onRequestClose()
@@ -200,14 +194,24 @@ fun AddDownloadPage(
                 )
             }
             Spacer(Modifier.size(24.dp))
+            val youTubeSizeString = youTubeSelectedFormat?.let {
+                com.abdownloadmanager.desktop.youtube.YouTubeVideoService.formatByteSize(it.estimatedSizeBytes)
+            }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .align(Alignment.Top)
                     .width(IntrinsicSize.Max)
             ) {
-                RenderFileTypeAndSize(component)
-                RenderResumeSupport(component)
+                RenderFileTypeAndSize(
+                    component = component,
+                    isYouTube = isYouTube,
+                    youTubeSizeString = youTubeSizeString,
+                )
+                RenderResumeSupport(
+                    component = component,
+                    isYouTube = isYouTube,
+                )
                 ConfigActionsButtons(component)
             }
         }
@@ -215,8 +219,7 @@ fun AddDownloadPage(
         MainActionButtons(
             component = component,
             isYouTube = isYouTube,
-            isYouTubeDownloading = isYouTubeDownloading,
-            onStartYouTubeDownload = youTubeDownloadTrigger,
+            youTubeSelectedFormat = youTubeSelectedFormat,
         )
         if (component.showSolutionsOnDuplicateDownloadUi) {
             ShowSolutionsOnDuplicateDownload(component)
@@ -396,7 +399,10 @@ private fun Divider() {
 
 
 @Composable
-fun RenderResumeSupport(component: BaseAddSingleDownloadComponent) {
+fun RenderResumeSupport(
+    component: BaseAddSingleDownloadComponent,
+    isYouTube: Boolean = false,
+) {
     val responseResult by component.checkResponseResult.collectAsState()
     val fileInfo = responseResult?.getOrNull()?.takeIf { it.isSuccessFul }
     Row(
@@ -409,27 +415,39 @@ fun RenderResumeSupport(component: BaseAddSingleDownloadComponent) {
             .background(myColors.onBackground / 10)
         Box(lineModifier)
         val canAddToDownloads by component.canAddToDownloads.collectAsState()
-        AnimatedVisibility(
-            visible = canAddToDownloads && fileInfo != null,
-        ) {
-            fileInfo?.let { fileInfo ->
-                val iconModifier = Modifier
-                    .padding(horizontal = 2.dp)
-                    .size(10.dp)
-                if (fileInfo.resumeSupport) {
-                    MyIcon(
-                        icon = MyIcons.check,
-                        contentDescription = null,
-                        modifier = iconModifier,
-                        tint = myColors.success
-                    )
-                } else {
-                    MyIcon(
-                        icon = MyIcons.clear,
-                        contentDescription = null,
-                        modifier = iconModifier,
-                        tint = myColors.error,
-                    )
+        if (isYouTube) {
+            val iconModifier = Modifier
+                .padding(horizontal = 2.dp)
+                .size(10.dp)
+            MyIcon(
+                icon = MyIcons.check,
+                contentDescription = null,
+                modifier = iconModifier,
+                tint = myColors.success
+            )
+        } else {
+            AnimatedVisibility(
+                visible = canAddToDownloads && fileInfo != null,
+            ) {
+                fileInfo?.let { fileInfo ->
+                    val iconModifier = Modifier
+                        .padding(horizontal = 2.dp)
+                        .size(10.dp)
+                    if (fileInfo.resumeSupport) {
+                        MyIcon(
+                            icon = MyIcons.check,
+                            contentDescription = null,
+                            modifier = iconModifier,
+                            tint = myColors.success
+                        )
+                    } else {
+                        MyIcon(
+                            icon = MyIcons.clear,
+                            contentDescription = null,
+                            modifier = iconModifier,
+                            tint = myColors.error,
+                        )
+                    }
                 }
             }
         }
@@ -471,9 +489,9 @@ fun ConfigActionsButtons(component: BaseAddSingleDownloadComponent) {
 private fun MainActionButtons(
     component: BaseAddSingleDownloadComponent,
     isYouTube: Boolean = false,
-    isYouTubeDownloading: Boolean = false,
-    onStartYouTubeDownload: (() -> Unit)? = null,
+    youTubeSelectedFormat: com.abdownloadmanager.desktop.youtube.YouTubeFormatOption? = null,
 ) {
+    val credentials by component.credentials.collectAsState()
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth()
@@ -512,21 +530,25 @@ private fun MainActionButtons(
             }
 
             val isDownloadEnabled = if (isYouTube) {
-                !isYouTubeDownloading && onStartYouTubeDownload != null
+                youTubeSelectedFormat != null
             } else {
                 canAddToDownloads
             }
 
             PrimaryMainActionButton(
-                text = if (isYouTube && isYouTubeDownloading) "Mengunduh..." else myStringResource(Res.string.download),
+                text = myStringResource(Res.string.download),
                 modifier = Modifier,
                 enabled = isDownloadEnabled,
                 onClick = {
-                    if (isYouTube && onStartYouTubeDownload != null) {
-                        onStartYouTubeDownload()
-                    } else {
-                        component.onRequestDownload()
+                    if (isYouTube) {
+                        youTubeSelectedFormat?.let { fmt ->
+                            com.abdownloadmanager.desktop.youtube.YouTubeVideoService.registerDownloadFormat(
+                                credentials.link,
+                                fmt
+                            )
+                        }
                     }
+                    component.onRequestDownload()
                 },
             )
             if (onDuplicateStrategy != null) {
@@ -544,9 +566,6 @@ private fun MainActionButtons(
             text = myStringResource(Res.string.cancel),
             modifier = Modifier,
             onClick = {
-                if (isYouTube) {
-                    com.abdownloadmanager.desktop.youtube.YouTubeVideoService.cancelActiveDownload()
-                }
                 component.onRequestClose()
             },
         )
@@ -556,55 +575,76 @@ private fun MainActionButtons(
 @Composable
 fun RenderFileTypeAndSize(
     component: BaseAddSingleDownloadComponent,
+    isYouTube: Boolean = false,
+    youTubeSizeString: String? = null,
 ) {
     val isLinkLoading by component.isLinkLoading.collectAsState()
     val linkCheckResult by component.checkResponseResult.collectAsState()
     val fileIconProvider = component.iconProvider
     val iconModifier = Modifier.size(mySpacings.iconSize)
     Box(Modifier.padding(top = 16.dp)) {
-        AnimatedContent(
-            targetState = isLinkLoading,
-            transitionSpec = {
-                fadeIn() togetherWith fadeOut()
+        if (isYouTube) {
+            val downloadItem by component.downloadItem.collectAsState()
+            val icon = fileIconProvider.rememberIcon(downloadItem.name)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                WithContentAlpha(1f) {
+                    MyIcon(
+                        icon,
+                        null,
+                        iconModifier
+                    )
+                    val sizeText = youTubeSizeString ?: "Memuat..."
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        sizeText,
+                        fontSize = myTextSizes.sm,
+                    )
+                }
             }
-        ) { loading ->
-            if (loading) {
-                LoadingIndicator(iconModifier)
-            } else {
-//                val extension = getExtension(fileInfo?.fileName ?: usersSetFileName) ?: "unknown"
-                val downloadItem by component.downloadItem.collectAsState()
-                val icon = fileIconProvider.rememberIcon(downloadItem.name)
+        } else {
+            AnimatedContent(
+                targetState = isLinkLoading,
+                transitionSpec = {
+                    fadeIn() togetherWith fadeOut()
+                }
+            ) { loading ->
+                if (loading) {
+                    LoadingIndicator(iconModifier)
+                } else {
+                    val downloadItem by component.downloadItem.collectAsState()
+                    val icon = fileIconProvider.rememberIcon(downloadItem.name)
 
-//                val bitmap = FileIconProvider.getIconOfFileExtension(extension)
+                    AnimatedContent(
+                        linkCheckResult,
+                    ) { linkCheckResult ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            WithContentAlpha(1f) {
+                                when (linkCheckResult) {
+                                    null -> {
+                                        MyIcon(
+                                            icon = MyIcons.question,
+                                            contentDescription = null,
+                                            modifier = iconModifier,
+                                        )
+                                    }
 
-                AnimatedContent(
-                    linkCheckResult,
-                ) { linkCheckResult ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        WithContentAlpha(1f) {
-                            when (linkCheckResult) {
-                                null -> {
-                                    MyIcon(
-                                        icon = MyIcons.question,
-                                        contentDescription = null,
-                                        modifier = iconModifier,
-                                    )
-                                }
-
-                                else -> {
-                                    MyIcon(
-                                        icon,
-                                        null,
-                                        iconModifier
-                                    )
-                                    val size = component.getLengthString()
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(
-                                        size.rememberString(),
-                                        fontSize = myTextSizes.sm,
-                                    )
+                                    else -> {
+                                        MyIcon(
+                                            icon,
+                                            null,
+                                            iconModifier
+                                        )
+                                        val size = component.getLengthString()
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            size.rememberString(),
+                                            fontSize = myTextSizes.sm,
+                                        )
+                                    }
                                 }
                             }
                         }

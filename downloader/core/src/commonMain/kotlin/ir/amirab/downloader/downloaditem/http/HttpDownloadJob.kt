@@ -162,6 +162,10 @@ class HttpDownloadJob(
                 return@launch
             }
             onDownloadResuming()
+            val extHandler = externalDownloadHandler
+            if (extHandler != null && extHandler(this@HttpDownloadJob)) {
+                return@launch
+            }
             try {
                 fetchDownloadInfoAndValidate()
                 createPartsIfNotCreated()
@@ -243,13 +247,28 @@ class HttpDownloadJob(
         }
     }
 
+    var customDownloadedSize: Long? = null
+
     override fun getDownloadedSize(): Long {
+        customDownloadedSize?.let { return it }
         return getParts().sumOf {
             it.howMuchProceed()
         }
 //        return partDownloaderList.values.sumOf {
 //            it.progressFlow.value.value
 //        }
+    }
+
+    fun notifyResumed() {
+        onDownloadResumed()
+    }
+
+    fun notifyFinished() {
+        onDownloadFinished()
+    }
+
+    suspend fun notifyCanceled(t: Throwable) {
+        onDownloadCanceled(t)
     }
 
 
@@ -770,5 +789,9 @@ class HttpDownloadJob(
 
     override suspend fun extraConfigsReceived(config: DownloadJobExtraConfig) {
         // we don't have extra configs
+    }
+
+    companion object {
+        var externalDownloadHandler: (suspend (job: HttpDownloadJob) -> Boolean)? = null
     }
 }

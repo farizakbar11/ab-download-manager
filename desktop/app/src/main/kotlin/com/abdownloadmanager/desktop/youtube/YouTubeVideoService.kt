@@ -1,5 +1,7 @@
 package com.abdownloadmanager.desktop.youtube
 
+import ir.amirab.downloader.downloaditem.DownloadStatus
+import ir.amirab.downloader.downloaditem.http.HttpDownloadJob
 import ir.amirab.util.logger.appLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -7,6 +9,7 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.InputStreamReader
 import java.net.URI
+import java.util.concurrent.ConcurrentHashMap
 
 object YouTubeVideoService {
     private val logger = appLogger.withTag("YouTubeVideoService")
@@ -111,8 +114,24 @@ object YouTubeVideoService {
 
                 val isSeparateAudio = matching.acodec == null || matching.acodec == "none"
                 val audioUrl = if (isSeparateAudio) bestAudio?.url else null
-                val matchingSize = (matching.filesize ?: matching.filesizeApprox ?: 0.0).toLong()
-                val audioSize = (bestAudio?.filesize ?: bestAudio?.filesizeApprox ?: 0.0).toLong()
+
+                val durationSec = raw.duration ?: 0.0
+                val rawMatchingSize = (matching.filesize ?: matching.filesizeApprox ?: 0.0).toLong()
+                val matchingSize = if (rawMatchingSize > 0) {
+                    rawMatchingSize
+                } else if (durationSec > 0 && (matching.tbr != null || matching.vbr != null)) {
+                    val bitrateKbps = matching.tbr ?: matching.vbr ?: 0.0
+                    (bitrateKbps * 1024.0 / 8.0 * durationSec).toLong()
+                } else 0L
+
+                val rawAudioSize = (bestAudio?.filesize ?: bestAudio?.filesizeApprox ?: 0.0).toLong()
+                val audioSize = if (rawAudioSize > 0) {
+                    rawAudioSize
+                } else if (durationSec > 0 && (bestAudio?.tbr ?: bestAudio?.abr != null)) {
+                    val audioKbps = bestAudio?.tbr ?: bestAudio?.abr ?: 128.0
+                    (audioKbps * 1024.0 / 8.0 * durationSec).toLong()
+                } else 0L
+
                 val totalSize = matchingSize + (if (isSeparateAudio) audioSize else 0L)
 
                 val label = when (h) {
@@ -273,6 +292,8 @@ object YouTubeVideoService {
                         val (pctStr, sizeStr, speedStr, etaStr) = match.destructured
                         val pct = pctStr.toFloatOrNull() ?: 0f
                         val isAudioStage = currentLine.contains(".f") || currentLine.contains("audio") || format.isAudioOnly
+                        val total = parseSizeToBytes(sizeStr)
+                        val downloaded = if (total > 0) (total * (pct / 100.0)).toLong() else 0L
                         onProgress(
                             YouTubeDownloadProgress(
                                 percent = pct,
@@ -281,6 +302,8 @@ object YouTubeVideoService {
                                 etaStr = etaStr,
                                 statusText = if (isAudioStage) "Mengunduh audio..." else "Mengunduh video...",
                                 isRunning = true,
+                                downloadedBytes = downloaded,
+                                totalBytes = total,
                             )
                         )
                     }
@@ -321,5 +344,113 @@ object YouTubeVideoService {
 
     private fun sanitizeFileName(name: String): String {
         return name.replace(Regex("[\\\\/:*?\"<>|]"), " ").trim()
+    }
+
+    private val registeredFormats = ConcurrentHashMap<String, YouTubeFormatOption>()
+
+    fun registerDownloadFormat(url: String, format: YouTubeFormatOption) {
+        registeredFormats[url] = format
+    }
+
+    fun getRegisteredFormat(url: String): YouTubeFormatOption? {
+        return registeredFormats[url]
+    }
+
+    fun formatByteSize(bytes: Long): String {
+        if (bytes <= 0) return "0 B"
+        val units = arrayOf("B", "KB", "MB", "GB", "TB")
+        val digitGroups = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt().coerceIn(0, units.size - 1)
+        return String.format("%.1f %s", bytes / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
+    }
+
+    fun parseSizeToBytes(str: String): Long {
+        val clean = str.trim()
+        val match = Regex("""([\d\.]+)\s*([A-Za-z]+)""").find(clean) ?: return 0L
+        val value = match.groupValues[1].toDoubleOrNull() ?: return 0L
+        val unit = match.groupValues[2].uppercase()
+        return when {
+            unit.startsWith("G") -> (value * 1024.0 * 1024.0 * 1024.0).toLong()
+            unit.startsWith("M") -> (value * 1024.0 * 1024.0).toLong()
+            unit.startsWith("K") -> (value * 1024.0).toLong()
+            else -> value.toLong()
+        }
+    }
+
+    /**
+     * Connects HttpDownloadJob to natively execute YouTube downloads via yt-dlp.
+     */
+    fun initDownloadHandler() {
+        HttpDownloadJob.externalDownloadHandler = { job ->
+            val item = job.downloadItem
+            if (isYouTubeUrl(item.link)) {
+                handleNativeYouTubeDownload(job)
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+    private suspend fun handleNativeYouTubeDownload(job: HttpDownloadJob) {
+        val item = job.downloadItem
+        val targetFile = File(item.folder, item.name)
+        targetFile.parentFile?.mkdirs()
+
+        // Match format from registered formats, or by resolution tag in file name, or default
+        var fmt = getRegisteredFormat(item.link)
+        if (fmt == null) {
+            val resolved = resolveVideo(item.link).getOrNull()
+            if (resolved != null) {
+                val tagMatch = Regex("\\[(\\d+p[^\\]]*)\\]").find(item.name)?.groupValues?.get(1)
+                fmt = if (tagMatch != null) {
+                    resolved.formats.firstOrNull { it.resolutionLabel.startsWith(tagMatch) }
+                } else null
+                if (fmt == null) {
+                    fmt = resolved.defaultFormat ?: resolved.formats.firstOrNull()
+                }
+            }
+        }
+
+        if (fmt == null) {
+            job.notifyCanceled(IllegalStateException("Format YouTube tidak ditemukan untuk ${item.link}"))
+            return
+        }
+
+        item.status = DownloadStatus.Downloading
+        if (item.startTime == null) {
+            item.startTime = System.currentTimeMillis()
+        }
+        if (fmt.estimatedSizeBytes > 0) {
+            item.contentLength = fmt.estimatedSizeBytes
+        }
+        job.notifyResumed()
+        job.saveState()
+
+        val res = downloadVideoWithYtDlp(
+            videoUrl = item.link,
+            format = fmt,
+            targetFile = targetFile,
+            onProgress = { p ->
+                if (p.downloadedBytes > 0) {
+                    job.customDownloadedSize = p.downloadedBytes
+                }
+                if (p.totalBytes > 0) {
+                    item.contentLength = p.totalBytes
+                }
+            }
+        )
+
+        if (res.isSuccess) {
+            val completedFile = res.getOrNull() ?: targetFile
+            val finalLen = completedFile.length()
+            if (finalLen > 0) {
+                job.customDownloadedSize = finalLen
+                item.contentLength = finalLen
+            }
+            job.notifyFinished()
+        } else {
+            val err = res.exceptionOrNull() ?: Exception("Gagal mengunduh video")
+            job.notifyCanceled(err)
+        }
     }
 }

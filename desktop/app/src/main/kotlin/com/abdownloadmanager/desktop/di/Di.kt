@@ -244,6 +244,7 @@ val downloaderModule = module {
         }
     }.bind<DownloadItemStateFactory<IDownloadItem, DownloadJob>>()
     single {
+        com.abdownloadmanager.desktop.youtube.YouTubeVideoService.initDownloadHandler()
         DownloaderRegistry().apply {
             add(get<HttpDownloader>())
             add(get<HLSDownloader>())
