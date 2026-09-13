@@ -26,20 +26,9 @@
       return; // Already exists
     }
 
-    const hostContainer = document.querySelector('#player-container-outer') ||
-                          document.querySelector('#player-container') ||
-                          document.querySelector('ytd-player') ||
-                          document.querySelector('#movie_player')?.parentElement ||
-                          document.querySelector('#movie_player') ||
-                          document.querySelector('#shorts-player');
-    if (!hostContainer) return;
-
-    if (hostContainer.id !== 'movie_player') {
-      hostContainer.style.overflow = 'visible';
-    }
-    if (getComputedStyle(hostContainer).position === 'static') {
-      hostContainer.style.position = 'relative';
-    }
+    const subscribeBtn = document.querySelector('#owner #subscribe-button') ||
+                         document.querySelector('#subscribe-button') ||
+                         document.querySelector('ytd-watch-metadata #owner');
 
     const btn = document.createElement('div');
     btn.id = BUTTON_ID;
@@ -49,7 +38,7 @@
         <svg class="abdm-catcher-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
           <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
         </svg>
-        <span class="abdm-catcher-text">Download with AB Download Manager</span>
+        <span class="abdm-catcher-text">Download Video</span>
       </div>
     `;
 
@@ -58,7 +47,7 @@
       e.preventDefault();
 
       const textSpan = btn.querySelector('.abdm-catcher-text');
-      const originalText = textSpan.textContent;
+      const originalText = 'Download Video';
       textSpan.textContent = 'Membuka AB Download Manager...';
       btn.classList.add('abdm-loading');
 
@@ -107,7 +96,17 @@
       }
     });
 
-    hostContainer.appendChild(btn);
+    if (subscribeBtn) {
+      subscribeBtn.insertAdjacentElement('afterend', btn);
+    } else {
+      const actionsBar = document.querySelector('#top-level-buttons-computed') ||
+                         document.querySelector('#actions-inner') ||
+                         document.querySelector('#actions') ||
+                         document.querySelector('#player-container');
+      if (actionsBar) {
+        actionsBar.appendChild(btn);
+      }
+    }
   }
 
   function removeCatcherButton() {

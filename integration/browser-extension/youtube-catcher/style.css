@@ -1,36 +1,40 @@
-/* AB Download Manager - YouTube Video Catcher Overlay */
+/* AB Download Manager - YouTube Video Catcher Button */
 .abdm-floating-catcher {
-  position: absolute;
-  top: -40px;
-  right: 8px;
-  z-index: 999999;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 12px;
+  vertical-align: middle;
   cursor: pointer;
   user-select: none;
   font-family: Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  opacity: 0.95;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1000;
 }
 
 .abdm-floating-catcher:hover {
-  opacity: 1;
-  transform: translateY(-2px);
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.45));
+  transform: translateY(-1px);
 }
 
 .abdm-catcher-inner {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  background: linear-gradient(135deg, rgba(28, 28, 30, 0.92), rgba(44, 44, 46, 0.92));
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 20px;
-  padding: 6px 14px;
-  color: #ffffff;
-  font-size: 13px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 18px;
+  padding: 0 16px;
+  color: #f1f1f1;
+  font-size: 14px;
   font-weight: 500;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  transition: background 0.2s ease, border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.abdm-floating-catcher:hover .abdm-catcher-inner {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 .abdm-catcher-icon {
@@ -40,7 +44,7 @@
 }
 
 .abdm-floating-catcher:hover .abdm-catcher-icon {
-  transform: scale(1.1);
+  transform: scale(1.15);
 }
 
 .abdm-catcher-text {
@@ -49,6 +53,6 @@
 }
 
 .abdm-floating-catcher.abdm-loading .abdm-catcher-inner {
-  background: linear-gradient(135deg, rgba(20, 20, 22, 0.96), rgba(35, 35, 38, 0.96));
+  background: rgba(255, 255, 255, 0.15);
   border-color: rgba(255, 51, 75, 0.45);
 }
