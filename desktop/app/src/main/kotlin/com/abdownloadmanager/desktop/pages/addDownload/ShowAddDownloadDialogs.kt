@@ -61,8 +61,8 @@ private fun AddDownloadWindow(
                 wasYouTube = true
             }
             val isYouTube = wasYouTube
-            val h = (if (isYouTube) 380 else 265).applyUiScale(uiScale)
-            val w = (if (isYouTube) 560 else 500).applyUiScale(uiScale)
+            val h = (if (isYouTube) 480 else 265).applyUiScale(uiScale)
+            val w = (if (isYouTube) 580 else 500).applyUiScale(uiScale)
             val size = remember(isYouTube) {
                 DpSize(
                     height = h.dp,

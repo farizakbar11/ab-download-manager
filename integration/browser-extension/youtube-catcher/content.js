@@ -26,10 +26,20 @@
       return; // Already exists
     }
 
-    const playerContainer = document.querySelector('#movie_player') ||
-                            document.querySelector('.html5-video-player') ||
-                            document.querySelector('#shorts-player');
-    if (!playerContainer) return;
+    const hostContainer = document.querySelector('#player-container-outer') ||
+                          document.querySelector('#player-container') ||
+                          document.querySelector('ytd-player') ||
+                          document.querySelector('#movie_player')?.parentElement ||
+                          document.querySelector('#movie_player') ||
+                          document.querySelector('#shorts-player');
+    if (!hostContainer) return;
+
+    if (hostContainer.id !== 'movie_player') {
+      hostContainer.style.overflow = 'visible';
+    }
+    if (getComputedStyle(hostContainer).position === 'static') {
+      hostContainer.style.position = 'relative';
+    }
 
     const btn = document.createElement('div');
     btn.id = BUTTON_ID;
@@ -97,7 +107,7 @@
       }
     });
 
-    playerContainer.appendChild(btn);
+    hostContainer.appendChild(btn);
   }
 
   function removeCatcherButton() {

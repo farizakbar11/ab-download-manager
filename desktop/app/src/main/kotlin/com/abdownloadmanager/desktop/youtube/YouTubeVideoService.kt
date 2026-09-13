@@ -70,7 +70,6 @@ object YouTubeVideoService {
                 "--dump-json",
                 "--no-playlist",
                 "--no-warnings",
-                "--extractor-args", "youtube:player_client=ios,android,web_creator,web",
                 url
             )
             pb.redirectErrorStream(false)
@@ -97,12 +96,12 @@ object YouTubeVideoService {
 
             val options = mutableListOf<YouTubeFormatOption>()
 
-            // Group video formats by height (e.g. 1080, 720, 480, 360)
+            // Group video formats by height (e.g. 2160, 1440, 1080, 720, 480, 360)
             val videoStreams = raw.formats.filter {
                 (it.height?.toInt() ?: 0) >= 240 && it.url.isNotBlank()
             }
 
-            val heights = listOf(1080, 720, 480, 360)
+            val heights = listOf(2160, 1440, 1080, 720, 480, 360)
             for (h in heights) {
                 // Find matching video format, prefer mp4
                 val matching = videoStreams
@@ -117,6 +116,8 @@ object YouTubeVideoService {
                 val totalSize = matchingSize + (if (isSeparateAudio) audioSize else 0L)
 
                 val label = when (h) {
+                    2160 -> "4K (2160p)"
+                    1440 -> "2K (1440p)"
                     1080 -> "1080p (Full HD)"
                     720 -> "720p (HD)"
                     480 -> "480p (SD)"
