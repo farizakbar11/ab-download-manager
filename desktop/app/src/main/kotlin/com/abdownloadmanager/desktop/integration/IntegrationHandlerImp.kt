@@ -61,8 +61,8 @@ class IntegrationHandlerImp : IntegrationHandler, KoinComponent {
             addDownloaderInUiProps.credentials,
             basicDownloadItem = BasicDownloadItem(
                 folder = task.folder ?: appSettings.saveLocation.value,
-                name = task.name ?: addDownloaderInUiProps.extraConfig.suggestedName
-                ?: task.downloadSource.link.substringAfterLast("/"),
+                name = (task.name ?: addDownloaderInUiProps.extraConfig.suggestedName
+                ?: task.downloadSource.link.substringAfterLast("/")).replace(Regex("[\\\\/:*?\"<>|]"), " ").trim(),
             ),
         )
         val id = downloadSystem.addDownload(
@@ -111,7 +111,7 @@ class IntegrationHandlerImp : IntegrationHandler, KoinComponent {
             return AddDownloadCredentialsInUiProps(
                 credentials = credentials,
                 extraConfig = AddDownloadCredentialsInUiProps.Configs(
-                    suggestedName = it.suggestedName,
+                    suggestedName = it.suggestedName?.replace(Regex("[\\\\/:*?\"<>|]"), " ")?.trim(),
                 )
             )
         }

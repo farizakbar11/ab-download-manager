@@ -8,10 +8,8 @@
     const titleEl = document.querySelector('h1.ytd-watch-metadata yt-formatted-string') ||
                     document.querySelector('#title h1 yt-formatted-string') ||
                     document.querySelector('h2.title.ytd-shorts-player');
-    if (titleEl && titleEl.textContent) {
-      return titleEl.textContent.trim();
-    }
-    return document.title.replace(' - YouTube', '').trim();
+    const raw = (titleEl && titleEl.textContent) ? titleEl.textContent : document.title.replace(' - YouTube', '');
+    return raw.replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
   function isWatchPage() {
