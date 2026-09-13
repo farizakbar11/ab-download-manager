@@ -257,7 +257,7 @@ class DownloadMonitor(
             downloadManager.listOfJobsEvents.map { },
             downloadSpeedFlow,
             headlessQueuePendingItemsFlow,
-            intervalFlow(500.milliseconds)
+            intervalFlow(50.milliseconds)
         ).onEach {
             val newList = downloadManager.downloadJobs.filter {
                 it.status.value != DownloadJobStatus.Finished

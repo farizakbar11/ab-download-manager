@@ -273,11 +273,14 @@ object YouTubeVideoService {
                 "yt-dlp",
                 "--newline",
                 "--no-mtime",
+                "--progress-delta", "0.05",
+                "-N", "8",
                 "-f", formatSelector,
                 "--merge-output-format", "mp4",
                 "-o", finalTargetFile.absolutePath,
                 videoUrl
             )
+            pb.environment()["PYTHONUNBUFFERED"] = "1"
             pb.redirectErrorStream(true)
             val process = pb.start()
             activeDownloadProcess = process
