@@ -98,21 +98,22 @@ object YouTubeVideoService {
 
             // Group video formats by height (e.g. 1080, 720, 480, 360)
             val videoStreams = raw.formats.filter {
-                (it.height ?: 0) >= 240 && it.url.isNotBlank()
+                (it.height?.toInt() ?: 0) >= 240 && it.url.isNotBlank()
             }
 
             val heights = listOf(1080, 720, 480, 360)
             for (h in heights) {
                 // Find matching video format, prefer mp4
                 val matching = videoStreams
-                    .filter { it.height == h }
+                    .filter { it.height?.toInt() == h }
                     .sortedWith(compareByDescending<YtDlpRawFormat> { it.ext == "mp4" }.thenByDescending { it.tbr ?: 0.0 })
                     .firstOrNull() ?: continue
 
                 val isSeparateAudio = matching.acodec == null || matching.acodec == "none"
                 val audioUrl = if (isSeparateAudio) bestAudio?.url else null
-                val totalSize = (matching.filesize ?: matching.filesizeApprox ?: 0L) +
-                        (if (isSeparateAudio) (bestAudio?.filesize ?: bestAudio?.filesizeApprox ?: 0L) else 0L)
+                val matchingSize = (matching.filesize ?: matching.filesizeApprox ?: 0.0).toLong()
+                val audioSize = (bestAudio?.filesize ?: bestAudio?.filesizeApprox ?: 0.0).toLong()
+                val totalSize = matchingSize + (if (isSeparateAudio) audioSize else 0L)
 
                 val label = when (h) {
                     1080 -> "1080p (Full HD)"
@@ -137,7 +138,7 @@ object YouTubeVideoService {
 
             // Audio only option
             if (bestAudio != null && bestAudio.url.isNotBlank()) {
-                val audioSize = bestAudio.filesize ?: bestAudio.filesizeApprox ?: 0L
+                val audioSize = (bestAudio.filesize ?: bestAudio.filesizeApprox ?: 0.0).toLong()
                 options.add(
                     YouTubeFormatOption(
                         formatId = bestAudio.formatId,
