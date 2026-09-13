@@ -13,7 +13,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ABDownloadManager"
+rootProject.name = "4getDownloadManager"
 
 include("android:app")
 include("desktop:app")

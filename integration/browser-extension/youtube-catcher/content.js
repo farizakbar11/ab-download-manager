@@ -48,7 +48,7 @@
 
       const textSpan = btn.querySelector('.abdm-catcher-text');
       const originalText = 'Download Video';
-      textSpan.textContent = 'Membuka AB Download Manager...';
+      textSpan.textContent = 'Membuka 4get Download Manager...';
       btn.classList.add('abdm-loading');
 
       const videoUrl = window.location.href;

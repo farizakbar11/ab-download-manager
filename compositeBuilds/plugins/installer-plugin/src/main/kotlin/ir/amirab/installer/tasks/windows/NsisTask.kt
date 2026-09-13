@@ -46,7 +46,14 @@ abstract class NsisTask : DefaultTask() {
 
     init {
         nsisExecutable.convention(
-            project.provider { File("C:\\Program Files (x86)\\NSIS\\makensis.exe") }
+            project.provider {
+                listOf(
+                    File("C:\\Program Files (x86)\\NSIS\\makensis.exe"),
+                    File("C:\\Program Files\\NSIS\\makensis.exe"),
+                    File(System.getenv("LOCALAPPDATA") ?: "", "Programs\\nsis-3.10\\makensis.exe"),
+                    File(System.getenv("LOCALAPPDATA") ?: "", "Programs\\NSIS\\makensis.exe"),
+                ).firstOrNull { it.exists() } ?: File("C:\\Program Files (x86)\\NSIS\\makensis.exe")
+            }
         )
     }
 

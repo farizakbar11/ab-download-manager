@@ -1,8 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "AB Download Manager - YouTube Video Catcher",
+  "name": "4get Download Manager - YouTube Video Catcher",
   "version": "1.0.0",
-  "description": "YouTube Video Catcher layaknya IDM untuk AB Download Manager.",
+  "description": "YouTube Video Catcher layaknya IDM untuk 4get Download Manager.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
   "permissions": [
     "activeTab"
   ],
