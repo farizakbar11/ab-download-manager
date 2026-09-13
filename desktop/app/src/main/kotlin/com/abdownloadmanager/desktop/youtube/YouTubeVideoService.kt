@@ -6,12 +6,16 @@ import ir.amirab.util.logger.appLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import com.abdownloadmanager.desktop.repository.AppRepository
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 import java.io.File
 import java.io.InputStreamReader
 import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
 
-object YouTubeVideoService {
+object YouTubeVideoService : KoinComponent {
+    private val appRepository: AppRepository by inject()
     private val logger = appLogger.withTag("YouTubeVideoService")
 
     private val json = Json {
@@ -269,12 +273,19 @@ object YouTubeVideoService {
                 targetFile
             }
 
+            val configuredThreads = runCatching { appRepository.threadCount.value }.getOrDefault(8)
+            val configuredRetries = runCatching { appRepository.maxDownloadRetryCount.value }.getOrDefault(3)
+            val fragmentRetries = (configuredRetries * 5).coerceAtLeast(15)
+
             val pb = ProcessBuilder(
                 "yt-dlp",
                 "--newline",
                 "--no-mtime",
                 "--progress-delta", "0.05",
-                "-N", "8",
+                "-N", configuredThreads.toString(),
+                "--retries", configuredRetries.toString(),
+                "--fragment-retries", fragmentRetries.toString(),
+                "--retry-sleep", "1",
                 "-f", formatSelector,
                 "--merge-output-format", "mp4",
                 "-o", finalTargetFile.absolutePath,
@@ -292,11 +303,15 @@ object YouTubeVideoService {
             var lastStreamDownloaded = 0L
             var accumulatedDownloaded = 0L
             var currentStreamTotal = 0L
+            var lastErrorLine = ""
             val targetTotal = if (format.estimatedSizeBytes > 0) format.estimatedSizeBytes else 0L
 
             while (reader.readLine().also { line = it } != null) {
                 val currentLine = line ?: continue
                 logger.d { "yt-dlp: $currentLine" }
+                if (currentLine.startsWith("ERROR:") || currentLine.contains("Error") || currentLine.contains("HTTP Error")) {
+                    lastErrorLine = currentLine
+                }
                 if (mergerRegex.containsMatchIn(currentLine)) {
                     val finalMergedBytes = if (targetTotal > 0) (targetTotal * 0.99).toLong() else accumulatedDownloaded
                     onProgress(
@@ -348,7 +363,12 @@ object YouTubeVideoService {
             activeDownloadProcess = null
 
             if (exitCode != 0) {
-                error("Proses unduh dibatalkan atau gagal (kode keluar: $exitCode)")
+                val errorMsg = if (lastErrorLine.isNotBlank()) {
+                    "$lastErrorLine (kode keluar: $exitCode)"
+                } else {
+                    "Proses unduh dibatalkan atau gagal (kode keluar: $exitCode)"
+                }
+                error(errorMsg)
             }
 
             val actualFile = if (finalTargetFile.exists()) {
