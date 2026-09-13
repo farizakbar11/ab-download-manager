@@ -53,9 +53,13 @@ private fun AddDownloadWindow(
     val uiScale = LocalUiScale.current
     when (addDownloadComponent) {
         is BaseAddSingleDownloadComponent -> {
-            val h = 265.applyUiScale(uiScale)
-            val w = 500.applyUiScale(uiScale)
-            val size = remember {
+            val credentials by addDownloadComponent.credentials.collectAsState()
+            val isYouTube = remember(credentials.link) {
+                com.abdownloadmanager.desktop.youtube.YouTubeVideoService.isYouTubeUrl(credentials.link)
+            }
+            val h = (if (isYouTube) 380 else 265).applyUiScale(uiScale)
+            val w = (if (isYouTube) 560 else 500).applyUiScale(uiScale)
+            val size = remember(isYouTube) {
                 DpSize(
                     height = h.dp,
                     width = w.dp,

@@ -88,6 +88,17 @@ fun AddDownloadPage(
             },
             modifier = Modifier
         )
+        com.abdownloadmanager.desktop.youtube.YouTubeCatcherBanner(
+            currentUrl = credentials.link,
+            onFormatSelected = { format, videoTitle ->
+                setLink(format.videoUrl)
+                val cleanExt = format.extension
+                val cleanTitle = videoTitle.replace(Regex("[\\\\/:*?\"<>|]"), " ").trim()
+                val suggestedFileName = "$cleanTitle [${format.resolutionLabel.split(" ").first()}].$cleanExt"
+                component.setName(suggestedFileName)
+            },
+            modifier = Modifier.padding(top = 8.dp)
+        )
         Row {
             val canAddResult by component.canAddResult.collectAsState()
             Column(Modifier.weight(1f)) {

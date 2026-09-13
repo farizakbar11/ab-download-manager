@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "AB Download Manager - YouTube Video Catcher",
+  "version": "1.0.0",
+  "description": "YouTube Video Catcher layaknya IDM untuk AB Download Manager.",
+  "permissions": [
+    "activeTab"
+  ],
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "http://localhost:15151/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.youtube.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "style.css"
+      ],
+      "run_at": "document_end"
+    }
+  ]
+}
