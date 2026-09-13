@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlin.time.Duration.Companion.milliseconds
+import ir.amirab.util.HttpUrlUtils
 
 abstract class NewDownloadUiChecker<
         TCredentials : IDownloadCredentials,
@@ -113,11 +114,20 @@ abstract class NewDownloadUiChecker<
             .onEach {
                 it?.let { name ->
                     val currentName = this.name.value
+                    val urlPathName = runCatching { HttpUrlUtils.extractNameFromLink(credentials.value.link) }.getOrNull()
+                    val genericBaseNames = setOf("download", "file", "get", "view", "index", "media")
+                    val currentBaseName = currentName.substringBeforeLast('.').lowercase()
                     val isCurrentGeneric = currentName.isBlank() ||
                             currentName.startsWith("watch.") ||
-                            currentName.equals("videoplayback", ignoreCase = true)
+                            currentName.equals("videoplayback", ignoreCase = true) ||
+                            genericBaseNames.contains(currentName.lowercase()) ||
+                            genericBaseNames.contains(currentBaseName) ||
+                            (!currentName.contains('.') && name.contains('.')) ||
+                            (urlPathName != null && currentName.equals(urlPathName, ignoreCase = true) && !name.equals(urlPathName, ignoreCase = true))
+
                     val isNewGeneric = name.startsWith("watch.") ||
-                            name.equals("videoplayback", ignoreCase = true)
+                            name.equals("videoplayback", ignoreCase = true) ||
+                            genericBaseNames.contains(name.lowercase())
                     if (isCurrentGeneric && !isNewGeneric) {
                         this.name.update { name }
                     } else if (currentName.isBlank()) {

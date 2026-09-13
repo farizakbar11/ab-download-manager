@@ -90,7 +90,7 @@ class DownloadMonitor(
     private val downloadSpeedFlow = MutableStateFlow<SpeedAtTime>(SpeedAtTime.empty())
 
     private val averageDownloadSpeedFlow = downloadSpeedFlow
-        .saved(5)
+        .saved(10)
         .map { lastSpeedHistory ->
             val lastSpeeds = lastSpeedHistory.lastOrNull()?.speed ?: return@map SpeedAtTime.empty()
             SpeedAtTime(
@@ -110,7 +110,11 @@ class DownloadMonitor(
         updateUseAverageSpeedFlow(useAverageSpeed)
         speedMeterJob = scope.launch {
             var lastWrites = mapOf<Long, Long>()
+            var lastTime = System.currentTimeMillis()
             while (isActive) {
+                delay(100.milliseconds)
+                val currentTime = System.currentTimeMillis()
+                val elapsedMs = (currentTime - lastTime).coerceAtLeast(1L)
                 val newWrites = downloadManager.downloadJobs.associate {
                     it.id to it.getDownloadedSize()
                 }
@@ -121,22 +125,22 @@ class DownloadMonitor(
                             lastWrittenData != null -> {
                                 if (newWrite < lastWrittenData) {
                                     // maybe download was restarted our lastWrittenData is not valid anymore
-                                    newWrite
+                                    (newWrite * 1000L) / elapsedMs
                                 } else {
-                                    newWrite - lastWrittenData
+                                    ((newWrite - lastWrittenData) * 1000L) / elapsedMs
                                 }
                             }
 
                             else -> {
                                 // this item seen for the first time
-                                0
+                                0L
                             }
                         }
                         newSpeed
                     }
                 )
                 lastWrites = newWrites
-                delay(1.seconds)
+                lastTime = currentTime
             }
         }
     }
